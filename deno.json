@@ -9,6 +9,8 @@
   ],
   "imports": {
     "hono": "npm:hono@^4.12.23",
-    "@cliffy/command": "jsr:@cliffy/command@^1.0.0-rc.7"
+    "@cliffy/command": "jsr:@cliffy/command@^1.0.0-rc.7",
+    "@std/assert": "jsr:@std/assert@^1",
+    "@std/path": "jsr:@std/path@^1"
   }
 }

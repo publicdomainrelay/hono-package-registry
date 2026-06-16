@@ -286,6 +286,34 @@ export function createPackageRegistryFactory(
       }
     }
 
+    // -- meta.json: package metadata (fallback for scoped packages) --
+    const metaPkgMatch = pathname.match(
+      /^\/(?:@([^/]+)\/)?([^/@]+)\/meta\.json$/,
+    );
+    if (metaPkgMatch) {
+      const [, scope, pkgName] = metaPkgMatch;
+      const fqn = fullName(scope, pkgName);
+
+      try {
+        const packages = await store.list();
+        const entry = packages.find((p) => p.name === fqn);
+
+        if (entry) {
+          const versions: Record<string, Record<string, unknown>> = {};
+          for (const v of entry.versions) versions[v] = {};
+          const latest = entry.versions[entry.versions.length - 1];
+          return c.json(
+            scope
+              ? { scope, name: pkgName, latest, versions }
+              : { name: pkgName, latest, versions },
+          );
+        }
+      } catch {
+        // fall through to 404
+      }
+      return c.json({ error: "PackageNotFound", message: `${fqn} not found` }, 404);
+    }
+
     // -- file serving --
     let parsed = parsePackageUrl(pathname) ?? parseJsrUrl(pathname);
 
