@@ -1,0 +1,9 @@
+{
+  "name": "@hono-jsr/package-store-local-fs",
+  "version": "0.0.0",
+  "license": "Unlicense",
+  "exports": "./mod.ts",
+  "imports": {
+    "@hono-jsr/package-store-abc": "../abc/package-store/mod.ts"
+  }
+}

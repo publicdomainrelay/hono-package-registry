@@ -1,0 +1,24 @@
+{
+  "store": {
+    "type": "string",
+    "env": "PACKAGE_REGISTRY_STORE",
+    "default": "local",
+    "description": "Backing store: git or local"
+  },
+  "gitUrl": {
+    "type": "string",
+    "env": "PACKAGE_REGISTRY_GIT_URL",
+    "description": "Remote git repository URL (required for git store)"
+  },
+  "baseDir": {
+    "type": "string",
+    "env": "PACKAGE_REGISTRY_BASE_DIR",
+    "description": "Local filesystem directory (required for local store)"
+  },
+  "port": {
+    "type": "number",
+    "env": "PORT",
+    "default": 8080,
+    "description": "HTTP port to listen on"
+  }
+}

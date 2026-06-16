@@ -1,0 +1,13 @@
+{
+  "name": "@hono-jsr/hono-package-registry",
+  "version": "0.0.0",
+  "license": "Unlicense",
+  "exports": "./main.ts",
+  "imports": {
+    "@hono-jsr/package-store-abc": "../lib/abc/package-store/mod.ts",
+    "@hono-jsr/package-store-local-fs": "../lib/package-store-local-fs/mod.ts",
+    "@hono-jsr/package-store-remote-git": "../lib/package-store-remote-git/mod.ts",
+    "@hono-jsr/hono-factory-package-registry": "../lib/hono-factory-package-registry/mod.ts",
+    "hono": "npm:hono@^4.12.23"
+  }
+}

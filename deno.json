@@ -1,0 +1,14 @@
+{
+  "nodeModulesDir": "auto",
+  "workspace": [
+    "lib/abc/package-store",
+    "lib/package-store-local-fs",
+    "lib/package-store-remote-git",
+    "lib/hono-factory-package-registry",
+    "hono-package-registry"
+  ],
+  "imports": {
+    "hono": "npm:hono@^4.12.23",
+    "@cliffy/command": "jsr:@cliffy/command@^1.0.0-rc.7"
+  }
+}
