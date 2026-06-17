@@ -506,8 +506,8 @@ Deno.test("registry HTTP: fallback packages appear in meta.json", async () => {
   const res = await app.request("/@publicdomainrelay/hono-jsr-package-store-abc/meta.json");
   assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.scope, "hono-jsr");
-  assertEquals(body.name, "package-store-abc");
+  assertEquals(body.scope, "publicdomainrelay");
+  assertEquals(body.name, "hono-jsr-package-store-abc");
   assertEquals(body.latest, "0.0.0");
 });
 
