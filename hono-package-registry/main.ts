@@ -4,6 +4,7 @@ import { createLocalFsStore } from "@publicdomainrelay/hono-jsr-package-store-lo
 import { createRemoteGitStore } from "@publicdomainrelay/hono-jsr-package-store-remote-git";
 import { createCompositeStore } from "@publicdomainrelay/hono-jsr-package-store-composite";
 import { createPackageRegistryFactory } from "@publicdomainrelay/hono-jsr-factory-package-registry";
+import { rawStructuredLogger, type LogLevel } from "@publicdomainrelay/logger";
 
 type StoreMode = "git" | "local";
 
@@ -49,6 +50,9 @@ if (import.meta.main) {
     .option("--fallback-version <version>", "Fallback version when no real version found", {
       default: "0.0.0",
     })
+    .option("--log-level <level>", "Minimum log level (debug, info, warn, error)", {
+      default: "info",
+    })
     .parse(Deno.args);
 
   const port = options.port;
@@ -89,19 +93,16 @@ if (import.meta.main) {
     passthrough,
   });
 
-  console.log(JSON.stringify({
+  const log = rawStructuredLogger("hono-package-registry", options.logLevel as LogLevel);
+  log("info", "registry_starting", {
     event: "registry_starting",
     storeMode: options.storesConfig ? "composite" : (options.store as string),
     port,
     passthrough,
     fallbackVersion,
-  }));
+  });
 
   Deno.serve({ port, onListen: ({ port, hostname }) => {
-    console.log(JSON.stringify({
-      event: "listen",
-      hostname,
-      port,
-    }));
+    log("info", "listen", { event: "listen", hostname, port });
   }, }, app.fetch);
 }

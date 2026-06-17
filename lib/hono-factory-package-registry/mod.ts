@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { PackageStore } from "@publicdomainrelay/hono-jsr-package-store-abc";
+import { rawStructuredLogger } from "@publicdomainrelay/logger";
 
 export interface PackageRegistryOptions {
   store: PackageStore;
@@ -129,12 +130,7 @@ export function createPackageRegistryFactory(
   const LABEL = label ?? "pkg-registry";
   const app = new Hono();
 
-  const logInfo = (obj: Record<string, unknown>) => console.log(JSON.stringify(obj));
-  const log = (
-    severity: string,
-    msg: string,
-    extra?: Record<string, unknown>,
-  ) => logInfo({ label: LABEL, severity, message: msg, ...(extra ?? {}) });
+  const log = rawStructuredLogger(LABEL);
 
   app.use("*", async (c, next) => {
     const method = c.req.method;

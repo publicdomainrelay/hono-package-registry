@@ -9,6 +9,7 @@
     "hono-package-registry"
   ],
   "imports": {
+    "@publicdomainrelay/logger": "../typescript-helpers/lib/logger/mod.ts",
     "hono": "npm:hono@^4.12.23",
     "@cliffy/command": "jsr:@cliffy/command@^1.0.0-rc.7",
     "@std/assert": "jsr:@std/assert@^1",
