@@ -168,8 +168,6 @@ export function createPackageRegistryFactory(
     }
   });
 
-  // -- import map: resolve bare specifiers to this registry --
-
   const SEMVER_RE = /^\d+\.\d+\.\d+/;
 
   app.get("/import-map.json", async (c) => {
@@ -222,8 +220,6 @@ export function createPackageRegistryFactory(
 
     return c.json({ imports });
   });
-
-  // -- JSR: package metadata (meta.json) --
 
   app.get("/@:scope/:name/meta.json", async (c) => {
     const scope = c.req.param("scope");
@@ -284,8 +280,6 @@ export function createPackageRegistryFactory(
     }
   });
 
-  // -- JSR: well-known discovery --
-
   app.get("/.well-known/jsr", (c) => {
     const host = new URL(c.req.url).host;
     const base = c.req.url.startsWith("https") ? `https://${host}` : `http://${host}`;
@@ -296,13 +290,10 @@ export function createPackageRegistryFactory(
     });
   });
 
-  // -- JSR: version metadata (_meta.json) + file serving (catch-all) --
-
   app.get("/*", async (c) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
 
-    // -- _meta.json: version metadata --
     const metaVersionMatch = pathname.match(
       /^\/(?:@([^/]+)\/)?([^/@]+)\/([^/]+)_meta\.json$/,
     );
@@ -346,7 +337,6 @@ export function createPackageRegistryFactory(
       }
     }
 
-    // -- meta.json: package metadata (fallback for scoped packages) --
     const metaPkgMatch = pathname.match(
       /^\/(?:@([^/]+)\/)?([^/@]+)\/meta\.json$/,
     );
@@ -369,14 +359,12 @@ export function createPackageRegistryFactory(
           );
         }
       } catch {
-        // fall through to 404
       }
       const proxied = await tryPassthrough(pathname, passthrough);
       if (proxied) return proxied;
       return c.json({ error: "PackageNotFound", message: `${fqn} not found` }, 404);
     }
 
-    // -- file serving --
     let parsed = parsePackageUrl(pathname) ?? parseJsrUrl(pathname);
 
     if (!parsed) {
