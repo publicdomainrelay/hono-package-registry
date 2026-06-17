@@ -4,6 +4,7 @@
     "lib/abc/package-store",
     "lib/package-store-local-fs",
     "lib/package-store-remote-git",
+    "lib/package-store-composite",
     "lib/hono-factory-package-registry",
     "hono-package-registry"
   ],

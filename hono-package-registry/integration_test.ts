@@ -1,7 +1,7 @@
 import { assertEquals, assertExists, assertStringIncludes } from "@std/assert";
-import { createLocalFsStore } from "@hono-jsr/package-store-local-fs";
-import { createRemoteGitStore } from "@hono-jsr/package-store-remote-git";
-import { createPackageRegistryFactory } from "@hono-jsr/hono-factory-package-registry";
+import { createLocalFsStore } from "@publicdomainrelay/hono-jsr-package-store-local-fs";
+import { createRemoteGitStore } from "@publicdomainrelay/hono-jsr-package-store-remote-git";
+import { createPackageRegistryFactory } from "@publicdomainrelay/hono-jsr-factory-package-registry";
 import { join, fromFileUrl } from "@std/path";
 
 const REPO_ROOT = fromFileUrl(import.meta.resolve("../")!);
@@ -394,7 +394,7 @@ console.log("VERSION:", VERSION);
   }
 });
 
-Deno.test("integration: self-host — this repo via git store -> deno uses ABC package", async () => {
+Deno.test("integration: self-host -- this repo via git store -> deno uses ABC package", async () => {
   try {
     await new Deno.Command("git", { args: ["--version"], stdout: "null" }).output();
   } catch {
@@ -437,15 +437,15 @@ Deno.test("integration: self-host — this repo via git store -> deno uses ABC p
   console.log("Discovered:", packages.map((p) => `${p.name} [${p.versions.join(", ")}]`).join(" | "));
   assertEquals(packages.length >= 1, true);
 
-  const abcPkg = packages.find((p) => p.name === "@hono-jsr/package-store-abc");
+  const abcPkg = packages.find((p) => p.name === "@publicdomainrelay/hono-jsr-package-store-abc");
   assertExists(abcPkg, "ABC package should be discovered");
   const abcVersion = abcPkg.versions.find((v) => v === "0.0.0");
   assertExists(abcVersion, "ABC package should have version 0.0.0");
 
   const projectDir = Deno.makeTempDirSync({ prefix: "int-selfproject-" });
-  writeDenoJsonWithImport(projectDir, "@hono-jsr/package-store-abc", registry.url, abcVersion!);
+  writeDenoJsonWithImport(projectDir, "@publicdomainrelay/hono-jsr-package-store-abc", registry.url, abcVersion!);
   await Deno.writeTextFile(join(projectDir, "main.ts"), `
-import type { PackageStore, PackageEntry, PackageVersion } from "@hono-jsr/package-store-abc";
+import type { PackageStore, PackageEntry, PackageVersion } from "@publicdomainrelay/hono-jsr-package-store-abc";
 
 const store: PackageStore = {
   async list(): Promise<PackageEntry[]> { return []; },
@@ -474,7 +474,7 @@ console.log("list returns:", JSON.stringify(await store.list()));
   }
 });
 
-Deno.test("integration: full pipeline — git http-backend -> registry -> deno resolves + runs", async () => {
+Deno.test("integration: full pipeline -- git http-backend -> registry -> deno resolves + runs", async () => {
   try {
     await new Deno.Command("git", { args: ["--version"], stdout: "null" }).output();
   } catch {

@@ -1,14 +1,15 @@
-import type { PackageEntry, PackageStore, PackageVersion } from "@hono-jsr/package-store-abc";
+import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/hono-jsr-package-store-abc";
 import { join } from "node:path";
 
 export interface LocalFsStoreOptions {
   baseDir: string;
+  fallbackVersion?: string;
 }
 
 const VALID_SEMVER = /^\d+\.\d+\.\d+/;
 
 export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
-  const { baseDir } = opts;
+  const { baseDir, fallbackVersion = "0.0.0" } = opts;
 
   async function readDir(path: string): Promise<Deno.DirEntry[]> {
     const entries: Deno.DirEntry[] = [];
@@ -17,7 +18,6 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
         entries.push(e);
       }
     } catch {
-      // directory does not exist
     }
     return entries;
   }
@@ -50,8 +50,8 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
 
   async function discoverPackages(): Promise<Map<string, string[]>> {
     const pkgs = new Map<string, string[]>();
-    const top = await readDir(baseDir);
 
+    const top = await readDir(baseDir);
     for (const entry of top) {
       if (!entry.isDirectory) continue;
 
@@ -77,11 +77,83 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
       }
     }
 
+    async function scanDir(current: string) {
+      for (const entry of await readDir(current)) {
+        const full = join(current, entry.name);
+        if (entry.isDirectory) {
+          if (
+            entry.name === "node_modules" ||
+            entry.name === ".git" ||
+            entry.name === ".github" ||
+            entry.name.startsWith(".")
+          ) {
+            continue;
+          }
+          await scanDir(full);
+        } else if (entry.name === "deno.json" || entry.name === "deno.jsonc") {
+          const content = await readTextFile(full);
+          if (!content) continue;
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            continue;
+          }
+          const name = typeof parsed.name === "string" ? parsed.name : undefined;
+          if (!name) continue;
+
+          if (pkgs.has(name)) continue;
+
+          pkgs.set(name, [fallbackVersion]);
+        }
+      }
+    }
+    await scanDir(baseDir);
+
     return pkgs;
   }
 
   function pkgDir(name: string, version: string): string {
     return join(baseDir, name, version);
+  }
+
+  let _denoJsonIndex: Map<string, { dir: string; meta: Record<string, unknown> }> | null = null;
+
+  async function getDenoJsonIndex(): Promise<Map<string, { dir: string; meta: Record<string, unknown> }>> {
+    if (_denoJsonIndex) return _denoJsonIndex;
+    _denoJsonIndex = new Map();
+
+    async function scanDir(current: string) {
+      for (const entry of await readDir(current)) {
+        const full = join(current, entry.name);
+        if (entry.isDirectory) {
+          if (
+            entry.name === "node_modules" ||
+            entry.name === ".git" ||
+            entry.name === ".github" ||
+            entry.name.startsWith(".")
+          ) {
+            continue;
+          }
+          await scanDir(full);
+        } else if (entry.name === "deno.json" || entry.name === "deno.jsonc") {
+          const content = await readTextFile(full);
+          if (!content) continue;
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            continue;
+          }
+          const name = typeof parsed.name === "string" ? parsed.name : undefined;
+          if (!name) continue;
+
+          _denoJsonIndex!.set(name, { dir: current, meta: parsed });
+        }
+      }
+    }
+    await scanDir(baseDir);
+    return _denoJsonIndex;
   }
 
   return {
@@ -97,13 +169,38 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
       const dir = pkgDir(name, version);
       try {
         const stat = await Deno.stat(dir);
-        if (!stat.isDirectory) return null;
+        if (stat.isDirectory) {
+          const files = await walkDir(dir);
+          return { name, version, files };
+        }
       } catch {
-        return null;
       }
 
-      const files = await walkDir(dir);
-      return { name, version, files };
+      if (version === fallbackVersion) {
+        const index = await getDenoJsonIndex();
+        const entry = index.get(name);
+        if (entry) {
+          const files = await walkDir(entry.dir);
+          const exports = entry.meta.exports;
+          return {
+            name,
+            version,
+            files,
+            metadata: {
+              exports: typeof exports === "string"
+                ? { ".": exports }
+                : (exports as Record<string, unknown> ?? undefined),
+              version: typeof entry.meta.version === "string"
+                ? entry.meta.version
+                : fallbackVersion,
+              dependencies: entry.meta.dependencies as Record<string, unknown> | undefined,
+              imports: entry.meta.imports as Record<string, unknown> | undefined,
+            },
+          };
+        }
+      }
+
+      return null;
     },
   };
 }

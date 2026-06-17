@@ -1,5 +1,5 @@
 {
-  "name": "@publicdomainrelay/hono-jsr-package-store-remote-git",
+  "name": "@publicdomainrelay/hono-jsr-package-store-composite",
   "version": "0.0.0",
   "license": "Unlicense",
   "exports": "./mod.ts",

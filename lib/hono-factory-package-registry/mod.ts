@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import type { PackageStore } from "@hono-jsr/package-store-abc";
+import type { PackageStore } from "@publicdomainrelay/hono-jsr-package-store-abc";
 
 export interface PackageRegistryOptions {
   store: PackageStore;
   label?: string;
+  passthrough?: boolean;
 }
 
 interface ParsedPackageUrl {
@@ -97,10 +98,34 @@ function fullName(scope: string | undefined, name: string): string {
   return scope ? `@${scope}/${name}` : name;
 }
 
+const JSR_ORIGIN = "https://jsr.io";
+
+async function tryPassthrough(
+  pathname: string,
+  passthrough: boolean,
+): Promise<Response | null> {
+  if (!passthrough) return null;
+  try {
+    const upstream = await fetch(`${JSR_ORIGIN}${pathname}`, {
+      redirect: "follow",
+    });
+    const headers = new Headers(upstream.headers);
+    headers.set("access-control-allow-origin", "*");
+    headers.set("cross-origin-resource-policy", "cross-origin");
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function createPackageRegistryFactory(
   opts: PackageRegistryOptions,
 ): Hono {
-  const { store, label } = opts;
+  const { store, label, passthrough = true } = opts;
   const LABEL = label ?? "pkg-registry";
   const app = new Hono();
 
@@ -205,6 +230,8 @@ export function createPackageRegistryFactory(
       const entry = packages.find((p) => p.name === fqn);
 
       if (!entry) {
+        const proxied = await tryPassthrough(c.req.path, passthrough);
+        if (proxied) return proxied;
         return c.json({ error: "PackageNotFound", message: `${fqn} not found` }, 404);
       }
 
@@ -233,6 +260,8 @@ export function createPackageRegistryFactory(
       const entry = packages.find((p) => p.name === pkgName);
 
       if (!entry) {
+        const proxied = await tryPassthrough(c.req.path, passthrough);
+        if (proxied) return proxied;
         return c.json({ error: "PackageNotFound", message: `${pkgName} not found` }, 404);
       }
 
@@ -248,6 +277,18 @@ export function createPackageRegistryFactory(
       log("error", "meta.json error", { package: pkgName, error: String(err) });
       return c.json({ error: "InternalError", message: String(err) }, 500);
     }
+  });
+
+  // -- JSR: well-known discovery --
+
+  app.get("/.well-known/jsr", (c) => {
+    const host = new URL(c.req.url).host;
+    const base = c.req.url.startsWith("https") ? `https://${host}` : `http://${host}`;
+    return c.json({
+      registry: base,
+      modules: base,
+      api: `${base}/api`,
+    });
   });
 
   // -- JSR: version metadata (_meta.json) + file serving (catch-all) --
@@ -267,6 +308,8 @@ export function createPackageRegistryFactory(
       try {
         const pkg = await store.get(fqn, version);
         if (!pkg) {
+          const proxied = await tryPassthrough(pathname, passthrough);
+          if (proxied) return proxied;
           return c.json(
             { error: "PackageNotFound", message: `${fqn}@${version} not found` },
             404,
@@ -279,7 +322,19 @@ export function createPackageRegistryFactory(
 
         const manifest = await buildManifest(pkg.files);
 
-        return c.json({ exports: exportsMap, manifest, moduleGraph2: {} });
+        const dependencies = pkg.metadata?.dependencies as
+          | Record<string, string>
+          | undefined;
+        const imports = pkg.metadata?.imports as
+          | Record<string, string>
+          | undefined;
+
+        return c.json({
+          exports: exportsMap,
+          manifest,
+          ...(dependencies ? { dependencies } : {}),
+          ...(imports ? { imports } : {}),
+        });
       } catch (err) {
         log("error", "_meta.json error", { package: fqn, version, error: String(err) });
         return c.json({ error: "InternalError", message: String(err) }, 500);
@@ -311,6 +366,8 @@ export function createPackageRegistryFactory(
       } catch {
         // fall through to 404
       }
+      const proxied = await tryPassthrough(pathname, passthrough);
+      if (proxied) return proxied;
       return c.json({ error: "PackageNotFound", message: `${fqn} not found` }, 404);
     }
 
@@ -318,15 +375,25 @@ export function createPackageRegistryFactory(
     let parsed = parsePackageUrl(pathname) ?? parseJsrUrl(pathname);
 
     if (!parsed) {
-      if (pathname.startsWith("/.well-known/")) {
-        return c.json({ error: "NotFound" }, 404);
+      if (pathname === "/.well-known/jsr") {
+        const host = new URL(c.req.url).host;
+        const base = c.req.url.startsWith("https") ? `https://${host}` : `http://${host}`;
+        return c.json({
+          registry: base,
+          modules: base,
+          api: `${base}/api`,
+        });
       }
+      const proxied = await tryPassthrough(pathname, passthrough);
+      if (proxied) return proxied;
       return c.json({ error: "NotFound", message: `Cannot parse URL: ${pathname}` }, 404);
     }
 
     try {
       const pkg = await store.get(parsed.name, parsed.version);
       if (!pkg) {
+        const proxied = await tryPassthrough(pathname, passthrough);
+        if (proxied) return proxied;
         return c.json({
           error: "PackageNotFound",
           message: `${parsed.name}@${parsed.version} not found`,

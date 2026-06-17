@@ -1,5 +1,7 @@
 {
   "port": 8080,
   "store": "local",
-  "baseDir": "./packages"
+  "baseDir": "./packages",
+  "passthrough": true,
+  "fallbackVersion": "0.0.0"
 }

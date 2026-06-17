@@ -1,8 +1,9 @@
-import type { PackageEntry, PackageStore, PackageVersion } from "@hono-jsr/package-store-abc";
+import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/hono-jsr-package-store-abc";
 
 export interface RemoteGitStoreOptions {
   url: string;
   cacheDir?: string;
+  fallbackVersion?: string;
 }
 
 const VERSION_TAG_RE = /^v?\d+\.\d+\.\d+/;
@@ -124,7 +125,7 @@ async function discoverPackages(
 }
 
 export function createRemoteGitStore(opts: RemoteGitStoreOptions): PackageStore {
-  const { url } = opts;
+  const { url, fallbackVersion = "0.0.0" } = opts;
   const cacheDir = opts.cacheDir ?? Deno.makeTempDirSync({ prefix: "pkg-git-" });
   const fallbackName = derivePackageName(url);
   const defaultOwner = fallbackName.replace(/^@/, "").split("/")[0];
@@ -389,6 +390,14 @@ export function createRemoteGitStore(opts: RemoteGitStoreOptions): PackageStore 
         }
       }
 
+      if (tags.length === 0) {
+        for (const [name, info] of pkgVersions) {
+          if (!info.versions.includes(fallbackVersion)) {
+            info.versions.push(fallbackVersion);
+          }
+        }
+      }
+
       return [...pkgVersions.entries()].map(([name, info]) => ({
         name,
         versions: info.versions.sort(),
@@ -433,6 +442,22 @@ export function createRemoteGitStore(opts: RemoteGitStoreOptions): PackageStore 
           ref = await resolveRef(repoDir, `$${pseudoMatch[1]}`);
         } else {
           ref = await resolveRef(repoDir, version);
+        }
+      }
+
+      if (!ref && version === fallbackVersion) {
+        const branches = await listBranches(repoDir);
+        const DEV_BRANCH_RE_GET = /^(main|master)$/;
+        const SAFE_BRANCH_RE_GET = /^[0-9A-Za-z-]+$/;
+        const ordered = [
+          ...branches.filter((b) => DEV_BRANCH_RE_GET.test(b)),
+          ...branches.filter((b) =>
+            !DEV_BRANCH_RE_GET.test(b) && SAFE_BRANCH_RE_GET.test(b)
+          ),
+        ];
+        for (const branch of ordered) {
+          ref = await resolveRef(repoDir, `$${branch}`);
+          if (ref) break;
         }
       }
 

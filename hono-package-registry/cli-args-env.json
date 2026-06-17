@@ -15,10 +15,25 @@
     "env": "PACKAGE_REGISTRY_BASE_DIR",
     "description": "Local filesystem directory (required for local store)"
   },
+  "storesConfig": {
+    "type": "string",
+    "env": "PACKAGE_REGISTRY_STORES_CONFIG",
+    "description": "Path to JSON file defining multiple stores (overrides --store)"
+  },
   "port": {
     "type": "number",
     "env": "PORT",
     "default": 8080,
     "description": "HTTP port to listen on"
+  },
+  "passthrough": {
+    "type": "flag",
+    "description": "Pass through to jsr.io when package not found locally (default: on, use --no-passthrough to disable)"
+  },
+  "fallbackVersion": {
+    "type": "string",
+    "env": "PACKAGE_REGISTRY_FALLBACK_VERSION",
+    "default": "0.0.0",
+    "description": "Version to use when package source has no tagged versions"
   }
 }
