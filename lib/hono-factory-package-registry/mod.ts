@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { PackageStore } from "@publicdomainrelay/hono-jsr-package-store-abc";
 import { rawStructuredLogger } from "@publicdomainrelay/logger";
+import { registerErrorMiddleware } from "@publicdomainrelay/hono-error-middleware";
+import type { LoggerInterface } from "@publicdomainrelay/logger";
 
 export interface PackageRegistryOptions {
   store: PackageStore;
@@ -131,6 +133,13 @@ export function createPackageRegistryFactory(
   const app = new Hono();
 
   const log = rawStructuredLogger(LABEL);
+  const logger: LoggerInterface = {
+    info: (msg, meta) => log("info", msg, meta),
+    warn: (msg, meta) => log("warn", msg, meta),
+    error: (msg, meta) => log("error", msg, meta),
+    debug: (msg, meta) => log("debug", msg, meta),
+  };
+  registerErrorMiddleware(app, logger);
 
   app.use("*", async (c, next) => {
     const method = c.req.method;
