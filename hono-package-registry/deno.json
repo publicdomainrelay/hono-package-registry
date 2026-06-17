@@ -4,6 +4,7 @@
   "license": "Unlicense",
   "exports": "./main.ts",
   "imports": {
+    "@publicdomainrelay/cli-args-env": "jsr:@publicdomainrelay/cli-args-env@^0",
     "@publicdomainrelay/hono-jsr-package-store-abc": "../lib/abc/package-store/mod.ts",
     "@publicdomainrelay/hono-jsr-package-store-local-fs": "../lib/package-store-local-fs/mod.ts",
     "@publicdomainrelay/hono-jsr-package-store-remote-git": "../lib/package-store-remote-git/mod.ts",
