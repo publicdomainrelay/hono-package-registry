@@ -1,12 +1,73 @@
 import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/hono-jsr-package-store-abc";
-import { join } from "node:path";
+import { basename, dirname, join, normalize, sep } from "node:path";
+
+function syntheticCliName(
+  parsed: Record<string, unknown>,
+  entries: Deno.DirEntry[],
+  dir: string,
+): string | undefined {
+  if ("workspace" in parsed) return undefined;
+  if (!entries.some((e) => e.name === "cli-args-env.json")) return undefined;
+  return `@publicdomainrelay/${basename(dir)}`;
+}
 
 export interface LocalFsStoreOptions {
   baseDir: string;
   fallbackVersion?: string;
 }
 
+interface PkgDir {
+  dir: string;
+  name: string;
+  version: string;
+}
+
+interface RewriteContext {
+  map: Record<string, string>;
+  pkgDir: string;
+  fileDir: string;
+  pkgDirs: PkgDir[];
+}
+
 const VALID_SEMVER = /^\d+\.\d+\.\d+/;
+const MODULE_EXT = /\.(?:ts|tsx|js|jsx|mjs|mts|cts)$/;
+const SPEC_SCHEME = /^(?:\.\.?\/|\/|[a-z][a-z0-9+.-]*:)/i;
+const REMOTE_TARGET = /^(?:jsr:|npm:|node:|https?:|data:)/;
+
+function resolveSpecifier(spec: string, ctx: RewriteContext): string {
+  if (spec.startsWith("./") || spec.startsWith("../")) {
+    const abs = normalize(join(ctx.fileDir, spec));
+    if (abs === ctx.pkgDir || abs.startsWith(ctx.pkgDir + sep)) return spec;
+    const owner = ctx.pkgDirs.find((p) => abs === p.dir || abs.startsWith(p.dir + sep));
+    if (owner) {
+      const sub = abs.slice(owner.dir.length).split(sep).join("/").replace(/^\//, "");
+      return `jsr:${owner.name}@${owner.version}${sub ? `/${sub}` : ""}`;
+    }
+    return spec;
+  }
+  if (SPEC_SCHEME.test(spec)) return spec;
+  const map = ctx.map;
+  let bestKey = "";
+  for (const k of Object.keys(map)) {
+    const isPrefix = k.endsWith("/") ? spec.startsWith(k) : spec === k || spec.startsWith(`${k}/`);
+    if (isPrefix && k.length > bestKey.length) bestKey = k;
+  }
+  if (bestKey && REMOTE_TARGET.test(map[bestKey])) {
+    return map[bestKey] + spec.slice(bestKey.length);
+  }
+  if (spec.startsWith("@publicdomainrelay/")) {
+    const pkg = spec.split("/").slice(0, 2).join("/");
+    return `jsr:${pkg}@^0${spec.slice(pkg.length)}`;
+  }
+  return spec;
+}
+
+function rewriteSource(src: string, ctx: RewriteContext): string {
+  return src
+    .replace(/\bfrom\s*(["'])([^"']+)\1/g, (_m, q, s) => `from ${q}${resolveSpecifier(s, ctx)}${q}`)
+    .replace(/\bimport\s*\(\s*(["'])([^"']+)\1\s*\)/g, (_m, q, s) => `import(${q}${resolveSpecifier(s, ctx)}${q})`)
+    .replace(/(^|[\n;])(\s*import\s*)(["'])([^"']+)\3/g, (_m, p, imp, q, s) => `${p}${imp}${q}${resolveSpecifier(s, ctx)}${q}`);
+}
 
 export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
   const { baseDir, fallbackVersion = "0.0.0" } = opts;
@@ -78,7 +139,8 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
     }
 
     async function scanDir(current: string) {
-      for (const entry of await readDir(current)) {
+      const entries = await readDir(current);
+      for (const entry of entries) {
         const full = join(current, entry.name);
         if (entry.isDirectory) {
           if (
@@ -99,12 +161,17 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
           } catch {
             continue;
           }
-          const name = typeof parsed.name === "string" ? parsed.name : undefined;
+          const name = typeof parsed.name === "string"
+            ? parsed.name
+            : syntheticCliName(parsed, entries, current);
           if (!name) continue;
 
           if (pkgs.has(name)) continue;
 
-          pkgs.set(name, [fallbackVersion]);
+          const ver = typeof parsed.version === "string" && VALID_SEMVER.test(parsed.version)
+            ? parsed.version
+            : fallbackVersion;
+          pkgs.set(name, [ver]);
         }
       }
     }
@@ -118,13 +185,24 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
   }
 
   let _denoJsonIndex: Map<string, { dir: string; meta: Record<string, unknown> }> | null = null;
+  let _allConfigs: { dir: string; imports: Record<string, string> }[] = [];
+
+  async function realDir(path: string): Promise<string> {
+    try {
+      return await Deno.realPath(path);
+    } catch {
+      return path;
+    }
+  }
 
   async function getDenoJsonIndex(): Promise<Map<string, { dir: string; meta: Record<string, unknown> }>> {
     if (_denoJsonIndex) return _denoJsonIndex;
     _denoJsonIndex = new Map();
+    _allConfigs = [];
 
     async function scanDir(current: string) {
-      for (const entry of await readDir(current)) {
+      const entries = await readDir(current);
+      for (const entry of entries) {
         const full = join(current, entry.name);
         if (entry.isDirectory) {
           if (
@@ -145,15 +223,119 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
           } catch {
             continue;
           }
-          const name = typeof parsed.name === "string" ? parsed.name : undefined;
+          const abs = await realDir(current);
+          const imports = (parsed.imports as Record<string, string> | undefined) ?? {};
+          _allConfigs.push({ dir: abs, imports });
+
+          const name = typeof parsed.name === "string"
+            ? parsed.name
+            : syntheticCliName(parsed, entries, current);
           if (!name) continue;
 
-          _denoJsonIndex!.set(name, { dir: current, meta: parsed });
+          _denoJsonIndex!.set(name, { dir: abs, meta: parsed });
         }
       }
     }
     await scanDir(baseDir);
     return _denoJsonIndex;
+  }
+
+  async function pkgForPath(absFile: string): Promise<{ name: string; version: string } | null> {
+    const index = await getDenoJsonIndex();
+    let best: { name: string; version: string } | null = null;
+    let bestLen = -1;
+    for (const [name, e] of index) {
+      if (absFile === e.dir || absFile.startsWith(e.dir + sep)) {
+        if (e.dir.length > bestLen) {
+          bestLen = e.dir.length;
+          const v = e.meta.version;
+          best = {
+            name,
+            version: typeof v === "string" && VALID_SEMVER.test(v) ? v : fallbackVersion,
+          };
+        }
+      }
+    }
+    return best;
+  }
+
+  async function normalizeTarget(target: string, configDir: string): Promise<string> {
+    if (REMOTE_TARGET.test(target)) return target;
+    if (/^(?:\.\.?\/|\/)/.test(target)) {
+      const abs = await realDir(join(configDir, target));
+      const pkg = await pkgForPath(abs);
+      if (pkg) return `jsr:${pkg.name}@${pkg.version}`;
+    }
+    return target;
+  }
+
+  async function collectImportMap(pkgDir: string): Promise<Record<string, string>> {
+    await getDenoJsonIndex();
+    const target = await realDir(pkgDir);
+    const merged: Record<string, string> = {};
+    for (
+      const cfg of _allConfigs
+        .filter((c) => target === c.dir || target.startsWith(c.dir + sep))
+        .sort((a, b) => a.dir.length - b.dir.length)
+    ) {
+      for (const [k, v] of Object.entries(cfg.imports)) {
+        merged[k] = await normalizeTarget(v, cfg.dir);
+      }
+    }
+    return merged;
+  }
+
+  async function buildPkgDirs(): Promise<PkgDir[]> {
+    const index = await getDenoJsonIndex();
+    const arr: PkgDir[] = [];
+    for (const [name, e] of index) {
+      const v = e.meta.version;
+      arr.push({
+        dir: e.dir,
+        name,
+        version: typeof v === "string" && VALID_SEMVER.test(v) ? v : fallbackVersion,
+      });
+    }
+    arr.sort((a, b) => b.dir.length - a.dir.length);
+    return arr;
+  }
+
+  async function rewriteFiles(
+    files: Record<string, string>,
+    pkgDirRaw: string,
+  ): Promise<Record<string, string>> {
+    const pkgDir = await realDir(pkgDirRaw);
+    const map = await collectImportMap(pkgDir);
+    const pkgDirs = await buildPkgDirs();
+    const out: Record<string, string> = {};
+    for (const [path, content] of Object.entries(files)) {
+      if (MODULE_EXT.test(path)) {
+        const fileDir = dirname(join(pkgDir, path));
+        out[path] = rewriteSource(content, { map, pkgDir, fileDir, pkgDirs });
+      } else {
+        out[path] = content;
+      }
+    }
+    return out;
+  }
+
+  function expandExports(
+    files: Record<string, string>,
+    base: Record<string, unknown> | undefined,
+  ): Record<string, unknown> {
+    const ex: Record<string, unknown> = { ...(base ?? {}) };
+    for (const p of Object.keys(files)) {
+      if (MODULE_EXT.test(p)) ex[`./${p}`] = `./${p}`;
+    }
+    if (!ex["."]) {
+      const entry = "mod.ts" in files
+        ? "./mod.ts"
+        : "main.ts" in files
+        ? "./main.ts"
+        : Object.keys(files).find((f) => MODULE_EXT.test(f));
+      if (entry) ex["."] = entry.startsWith("./") ? entry : `./${entry}`;
+    }
+    return ex;
   }
 
   return {
@@ -170,29 +352,31 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
       try {
         const stat = await Deno.stat(dir);
         if (stat.isDirectory) {
-          const files = await walkDir(dir);
+          const files = await rewriteFiles(await walkDir(dir), dir);
           return { name, version, files };
         }
       } catch {
       }
 
-      if (version === fallbackVersion) {
-        const index = await getDenoJsonIndex();
-        const entry = index.get(name);
-        if (entry) {
-          const files = await walkDir(entry.dir);
+      const index = await getDenoJsonIndex();
+      const entry = index.get(name);
+      if (entry) {
+        const realVersion = typeof entry.meta.version === "string" && VALID_SEMVER.test(entry.meta.version)
+          ? entry.meta.version
+          : fallbackVersion;
+        if (version === realVersion || version === fallbackVersion) {
+          const files = await rewriteFiles(await walkDir(entry.dir), entry.dir);
           const exports = entry.meta.exports;
+          const baseExports = typeof exports === "string"
+            ? { ".": exports }
+            : (exports as Record<string, unknown> ?? undefined);
           return {
             name,
-            version,
+            version: realVersion,
             files,
             metadata: {
-              exports: typeof exports === "string"
-                ? { ".": exports }
-                : (exports as Record<string, unknown> ?? undefined),
-              version: typeof entry.meta.version === "string"
-                ? entry.meta.version
-                : fallbackVersion,
+              exports: expandExports(files, baseExports),
+              version: realVersion,
               dependencies: entry.meta.dependencies as Record<string, unknown> | undefined,
               imports: entry.meta.imports as Record<string, unknown> | undefined,
             },

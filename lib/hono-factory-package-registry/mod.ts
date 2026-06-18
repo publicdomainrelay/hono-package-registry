@@ -318,18 +318,9 @@ export function createPackageRegistryFactory(
 
         const manifest = await buildManifest(pkg.files);
 
-        const dependencies = pkg.metadata?.dependencies as
-          | Record<string, string>
-          | undefined;
-        const imports = pkg.metadata?.imports as
-          | Record<string, string>
-          | undefined;
-
         return c.json({
           exports: exportsMap,
           manifest,
-          ...(dependencies ? { dependencies } : {}),
-          ...(imports ? { imports } : {}),
         });
       } catch (err) {
         log("error", "_meta.json error", { package: fqn, version, error: String(err) });
