@@ -1,10 +1,10 @@
 {
-  "name": "@publicdomainrelay/hono-jsr-factory-package-registry",
+  "name": "@publicdomainrelay/hono-factory-package-registry",
   "version": "0.0.0",
   "license": "Unlicense",
   "exports": "./mod.ts",
   "imports": {
-    "@publicdomainrelay/hono-jsr-package-store-abc": "../abc/package-store/mod.ts",
+    "@publicdomainrelay/package-store-abc": "jsr:@publicdomainrelay/package-store-abc@^0",
     "hono": "npm:hono@^4.12.23"
   }
 }

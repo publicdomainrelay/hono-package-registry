@@ -1,4 +1,4 @@
-import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/hono-jsr-package-store-abc";
+import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/package-store-abc";
 import { basename, dirname, join, normalize, sep } from "node:path";
 
 function syntheticCliName(

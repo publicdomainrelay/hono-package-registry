@@ -1,9 +1,9 @@
 import { Command } from "@publicdomainrelay/cli-args-env";
-import type { PackageStore } from "@publicdomainrelay/hono-jsr-package-store-abc";
-import { createLocalFsStore } from "@publicdomainrelay/hono-jsr-package-store-local-fs";
-import { createRemoteGitStore } from "@publicdomainrelay/hono-jsr-package-store-remote-git";
-import { createCompositeStore } from "@publicdomainrelay/hono-jsr-package-store-composite";
-import { createPackageRegistryFactory } from "@publicdomainrelay/hono-jsr-factory-package-registry";
+import type { PackageStore } from "@publicdomainrelay/package-store-abc";
+import { createLocalFsStore } from "@publicdomainrelay/package-store-local-fs";
+import { createRemoteGitStore } from "@publicdomainrelay/package-store-remote-git";
+import { createCompositeStore } from "@publicdomainrelay/package-store-composite";
+import { createPackageRegistryFactory } from "@publicdomainrelay/hono-factory-package-registry";
 import { rawStructuredLogger, type LogLevel } from "@publicdomainrelay/logger";
 import cliArgsEnv from "./cli-args-env.json" with { type: "json" };
 
@@ -28,7 +28,7 @@ function buildStore(config: StoreConfig, fallbackVersion: string): PackageStore 
     }
     return createRemoteGitStore({ url: config.url, cacheDir: config.cacheDir, fallbackVersion });
   }
-  return createLocalFsStore({ baseDir: config.baseDir ?? "./packages", fallbackVersion });
+  return createLocalFsStore({ baseDir: config.baseDir as string, fallbackVersion });
 }
 
 let runtimeConfig = null;
@@ -70,7 +70,7 @@ if (options.storesConfig) {
     }
     store = createRemoteGitStore({ url: gitUrl, fallbackVersion });
   } else {
-    const baseDir = (options.baseDir as string) ?? "./packages";
+    const baseDir = (options.baseDir as string);
     store = createLocalFsStore({ baseDir, fallbackVersion });
   }
 }

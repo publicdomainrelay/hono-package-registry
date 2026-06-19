@@ -13,6 +13,7 @@
     },
     "base-dir": {
       "type": "string",
+      "default": "./packages",
       "description": "Local filesystem directory for local store"
     },
     "stores-config": {

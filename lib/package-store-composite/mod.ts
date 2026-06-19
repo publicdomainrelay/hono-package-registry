@@ -1,4 +1,4 @@
-import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/hono-jsr-package-store-abc";
+import type { PackageEntry, PackageStore, PackageVersion } from "@publicdomainrelay/package-store-abc";
 
 export interface CompositeStoreOptions {
   stores: PackageStore[];

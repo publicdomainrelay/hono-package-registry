@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PackageStore } from "@publicdomainrelay/hono-jsr-package-store-abc";
+import type { PackageStore } from "@publicdomainrelay/package-store-abc";
 import { rawStructuredLogger } from "@publicdomainrelay/logger";
 import { registerErrorMiddleware } from "@publicdomainrelay/hono-error-middleware";
 import type { LoggerInterface } from "@publicdomainrelay/logger";

@@ -1,7 +1,7 @@
 import { assertEquals, assertExists, assertStringIncludes, assertNotEquals } from "@std/assert";
-import { createLocalFsStore } from "@publicdomainrelay/hono-jsr-package-store-local-fs";
-import { createCompositeStore } from "@publicdomainrelay/hono-jsr-package-store-composite";
-import { createPackageRegistryFactory } from "@publicdomainrelay/hono-jsr-factory-package-registry";
+import { createLocalFsStore } from "@publicdomainrelay/package-store-local-fs";
+import { createCompositeStore } from "@publicdomainrelay/package-store-composite";
+import { createPackageRegistryFactory } from "@publicdomainrelay/hono-factory-package-registry";
 import { join, fromFileUrl } from "@std/path";
 
 const TEST_DIR = join(fromFileUrl(import.meta.resolve("../test-packages")!));
@@ -410,24 +410,24 @@ Deno.test("local-fs fallback: deno.json scan discovers workspace packages", asyn
   const packages = await store.list();
   const names = packages.map((p) => p.name);
 
-  // lib/abc/package-store/deno.json -> @publicdomainrelay/hono-jsr-package-store-abc
-  assertEquals(names.includes("@publicdomainrelay/hono-jsr-package-store-abc"), true);
+  // lib/abc/package-store/deno.json -> @publicdomainrelay/package-store-abc
+  assertEquals(names.includes("@publicdomainrelay/package-store-abc"), true);
 
-  // lib/hono-factory-package-registry/deno.json -> @publicdomainrelay/hono-jsr-factory-package-registry
-  assertEquals(names.includes("@publicdomainrelay/hono-jsr-factory-package-registry"), true);
+  // lib/hono-factory-package-registry/deno.json -> @publicdomainrelay/hono-factory-package-registry
+  assertEquals(names.includes("@publicdomainrelay/hono-factory-package-registry"), true);
 
-  // lib/package-store-local-fs/deno.json -> @publicdomainrelay/hono-jsr-package-store-local-fs
-  assertEquals(names.includes("@publicdomainrelay/hono-jsr-package-store-local-fs"), true);
+  // lib/package-store-local-fs/deno.json -> @publicdomainrelay/package-store-local-fs
+  assertEquals(names.includes("@publicdomainrelay/package-store-local-fs"), true);
 
-  // lib/package-store-remote-git/deno.json -> @publicdomainrelay/hono-jsr-package-store-remote-git
-  assertEquals(names.includes("@publicdomainrelay/hono-jsr-package-store-remote-git"), true);
+  // lib/package-store-remote-git/deno.json -> @publicdomainrelay/package-store-remote-git
+  assertEquals(names.includes("@publicdomainrelay/package-store-remote-git"), true);
 
-  // lib/package-store-composite/deno.json -> @publicdomainrelay/hono-jsr-package-store-composite
-  assertEquals(names.includes("@publicdomainrelay/hono-jsr-package-store-composite"), true);
+  // lib/package-store-composite/deno.json -> @publicdomainrelay/package-store-composite
+  assertEquals(names.includes("@publicdomainrelay/package-store-composite"), true);
 
   // all deno.json packages have version 0.0.0 (fallback)
   for (const pkg of packages) {
-    if (pkg.name.startsWith("@publicdomainrelay/hono-jsr-")) {
+    if (pkg.name.startsWith("@publicdomainrelay/")) {
       assertEquals(pkg.versions, ["0.0.0"]);
     }
   }
@@ -436,9 +436,9 @@ Deno.test("local-fs fallback: deno.json scan discovers workspace packages", asyn
 Deno.test("local-fs fallback: get serves files from deno.json directory", async () => {
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
 
-  const pkg = await store.get("@publicdomainrelay/hono-jsr-package-store-abc", "0.0.0");
+  const pkg = await store.get("@publicdomainrelay/package-store-abc", "0.0.0");
   assertExists(pkg);
-  assertEquals(pkg!.name, "@publicdomainrelay/hono-jsr-package-store-abc");
+  assertEquals(pkg!.name, "@publicdomainrelay/package-store-abc");
   assertEquals(pkg!.version, "0.0.0");
   assertEquals("mod.ts" in pkg!.files, true);
   assertEquals("deno.json" in pkg!.files, true);
@@ -448,14 +448,14 @@ Deno.test("local-fs fallback: get serves files from deno.json directory", async 
 Deno.test("local-fs fallback: get with wrong version returns null", async () => {
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
 
-  const pkg = await store.get("@publicdomainrelay/hono-jsr-package-store-abc", "9.9.9");
+  const pkg = await store.get("@publicdomainrelay/package-store-abc", "9.9.9");
   assertEquals(pkg, null);
 });
 
 Deno.test("local-fs fallback: get with non-fallback version returns null for deno-json pkg", async () => {
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
 
-  const pkg = await store.get("@publicdomainrelay/hono-jsr-package-store-abc", "1.0.0");
+  const pkg = await store.get("@publicdomainrelay/package-store-abc", "1.0.0");
   assertEquals(pkg, null);
 });
 
@@ -463,11 +463,11 @@ Deno.test("local-fs fallback: custom fallback version", async () => {
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT, fallbackVersion: "5.5.5" });
 
   const packages = await store.list();
-  const abcPkg = packages.find((p) => p.name === "@publicdomainrelay/hono-jsr-package-store-abc");
+  const abcPkg = packages.find((p) => p.name === "@publicdomainrelay/package-store-abc");
   assertExists(abcPkg);
   assertEquals(abcPkg!.versions, ["5.5.5"]);
 
-  const pkg = await store.get("@publicdomainrelay/hono-jsr-package-store-abc", "5.5.5");
+  const pkg = await store.get("@publicdomainrelay/package-store-abc", "5.5.5");
   assertExists(pkg);
   assertEquals(pkg!.version, "5.5.5");
 });
@@ -475,7 +475,7 @@ Deno.test("local-fs fallback: custom fallback version", async () => {
 Deno.test("local-fs fallback: deno.json pkg has metadata with exports", async () => {
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
 
-  const pkg = await store.get("@publicdomainrelay/hono-jsr-factory-package-registry", "0.0.0");
+  const pkg = await store.get("@publicdomainrelay/hono-factory-package-registry", "0.0.0");
   assertExists(pkg);
   assertEquals(typeof pkg!.metadata, "object");
   assertEquals(typeof (pkg!.metadata as Record<string, unknown>).exports, "object");
@@ -503,11 +503,11 @@ Deno.test("registry HTTP: fallback packages appear in meta.json", async () => {
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
   const app = createPackageRegistryFactory({ store, passthrough: false });
 
-  const res = await app.request("/@publicdomainrelay/hono-jsr-package-store-abc/meta.json");
+  const res = await app.request("/@publicdomainrelay/package-store-abc/meta.json");
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.scope, "publicdomainrelay");
-  assertEquals(body.name, "hono-jsr-package-store-abc");
+  assertEquals(body.name, "package-store-abc");
   assertEquals(body.latest, "0.0.0");
 });
 
@@ -515,7 +515,7 @@ Deno.test("registry HTTP: fallback packages serve via at-style URL", async () =>
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
   const app = createPackageRegistryFactory({ store, passthrough: false });
 
-  const res = await app.request("/@publicdomainrelay/hono-jsr-package-store-abc@0.0.0/mod.ts");
+  const res = await app.request("/@publicdomainrelay/package-store-abc@0.0.0/mod.ts");
   assertEquals(res.status, 200);
   assertEquals(
     res.headers.get("content-type")?.startsWith("text/typescript"),
@@ -529,7 +529,7 @@ Deno.test("registry HTTP: fallback packages serve via JSR-style URL", async () =
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
   const app = createPackageRegistryFactory({ store, passthrough: false });
 
-  const res = await app.request("/@publicdomainrelay/hono-jsr-package-store-abc/0.0.0/mod.ts");
+  const res = await app.request("/@publicdomainrelay/package-store-abc/0.0.0/mod.ts");
   assertEquals(res.status, 200);
   const body = await res.text();
   assertStringIncludes(body, "export interface PackageEntry");
@@ -539,7 +539,7 @@ Deno.test("registry HTTP: fallback _meta.json for deno.json package", async () =
   const store = createLocalFsStore({ baseDir: PROJECT_ROOT });
   const app = createPackageRegistryFactory({ store, passthrough: false });
 
-  const res = await app.request("/@publicdomainrelay/hono-jsr-package-store-abc/0.0.0_meta.json");
+  const res = await app.request("/@publicdomainrelay/package-store-abc/0.0.0_meta.json");
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(typeof body.exports, "object");

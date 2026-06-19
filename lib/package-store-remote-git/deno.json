@@ -1,9 +1,9 @@
 {
-  "name": "@publicdomainrelay/hono-jsr-package-store-remote-git",
+  "name": "@publicdomainrelay/package-store-remote-git",
   "version": "0.0.0",
   "license": "Unlicense",
   "exports": "./mod.ts",
   "imports": {
-    "@publicdomainrelay/hono-jsr-package-store-abc": "../abc/package-store/mod.ts"
+    "@publicdomainrelay/package-store-abc": "jsr:@publicdomainrelay/package-store-abc@^0"
   }
 }

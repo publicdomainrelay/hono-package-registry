@@ -1,15 +1,13 @@
 {
-  "name": "@publicdomainrelay/hono-jsr-package-registry",
   "version": "0.0.0",
   "license": "Unlicense",
-  "exports": "./main.ts",
   "imports": {
     "@publicdomainrelay/cli-args-env": "jsr:@publicdomainrelay/cli-args-env@^0",
-    "@publicdomainrelay/hono-jsr-package-store-abc": "../lib/abc/package-store/mod.ts",
-    "@publicdomainrelay/hono-jsr-package-store-local-fs": "../lib/package-store-local-fs/mod.ts",
-    "@publicdomainrelay/hono-jsr-package-store-remote-git": "../lib/package-store-remote-git/mod.ts",
-    "@publicdomainrelay/hono-jsr-package-store-composite": "../lib/package-store-composite/mod.ts",
-    "@publicdomainrelay/hono-jsr-factory-package-registry": "../lib/hono-factory-package-registry/mod.ts",
+    "@publicdomainrelay/package-store-abc": "jsr:@publicdomainrelay/package-store-abc@^0",
+    "@publicdomainrelay/package-store-local-fs": "jsr:@publicdomainrelay/package-store-local-fs@^0",
+    "@publicdomainrelay/package-store-remote-git": "jsr:@publicdomainrelay/package-store-remote-git@^0",
+    "@publicdomainrelay/package-store-composite": "jsr:@publicdomainrelay/package-store-composite@^0",
+    "@publicdomainrelay/hono-factory-package-registry": "jsr:@publicdomainrelay/hono-factory-package-registry@^0",
     "hono": "npm:hono@^4.12.23"
   }
 }
