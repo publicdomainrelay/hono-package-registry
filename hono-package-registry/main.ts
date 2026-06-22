@@ -4,7 +4,8 @@ import { createLocalFsStore } from "@publicdomainrelay/package-store-local-fs";
 import { createRemoteGitStore } from "@publicdomainrelay/package-store-remote-git";
 import { createCompositeStore } from "@publicdomainrelay/package-store-composite";
 import { createPackageRegistryFactory } from "@publicdomainrelay/hono-factory-package-registry";
-import { rawStructuredLogger, type LogLevel } from "@publicdomainrelay/logger";
+import { createServe } from "@publicdomainrelay/serve";
+import { createStructuredLogger, type LogLevel } from "@publicdomainrelay/logger";
 import cliArgsEnv from "./cli-args-env.json" with { type: "json" };
 
 type StoreMode = "git" | "local";
@@ -81,8 +82,8 @@ const app = createPackageRegistryFactory({
   passthrough,
 });
 
-const log = rawStructuredLogger("hono-package-registry", options.logLevel as LogLevel);
-log("info", "registry_starting", {
+const logger = createStructuredLogger("hono-package-registry", options.logLevel as LogLevel);
+logger.info("registry_starting", {
   event: "registry_starting",
   storeMode: options.storesConfig ? "composite" : (options.store as string),
   port,
@@ -90,6 +91,14 @@ log("info", "registry_starting", {
   fallbackVersion,
 });
 
-Deno.serve({ port, onListen: ({ port, hostname }) => {
-  log("info", "listen", { event: "listen", hostname, port });
-}, }, app.fetch);
+const serve = createServe({ logger, tcp: { port } });
+serve.app.route("/", app as never);
+
+function shutdown() {
+  serve.shutdown();
+  Deno.exit();
+}
+Deno.addSignalListener("SIGINT", shutdown);
+Deno.addSignalListener("SIGTERM", shutdown);
+
+await serve.beginServe();
