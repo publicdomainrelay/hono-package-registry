@@ -13,20 +13,12 @@ interface ServerHandle {
   controller: AbortController;
 }
 
-function allocatePort(): number {
-  const listener = Deno.listen({ port: 0 });
-  const port = listener.addr.port;
-  try { listener.close(); } catch { /* ok */ }
-  return port;
-}
-
-function startRegistry(store: ReturnType<typeof createLocalFsStore | typeof createRemoteGitStore>): ServerHandle {
+function startRegistry(store: ReturnType<typeof createLocalFsStore | typeof createRemoteGitStore>): Promise<ServerHandle> {
   const controller = new AbortController();
   const app = createPackageRegistryFactory({ store, label: "integration-test" });
-  const port = allocatePort();
-  const url = `http://localhost:${port}`;
-  Deno.serve({ port, signal: controller.signal }, app.fetch);
-  return { url, controller };
+  const { promise: portReady, resolve: resolvePort } = Promise.withResolvers<number>();
+  Deno.serve({ port: 0, signal: controller.signal, onListen: (addr) => resolvePort((addr as Deno.NetAddr).port) }, app.fetch);
+  return portReady.then((port) => ({ url: `http://localhost:${port}`, controller }));
 }
 
 function runDeno(args: string[], cwd: string, env?: Record<string, string>): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -137,13 +129,11 @@ function indexOfBytes(haystack: Uint8Array, needle: Uint8Array): number {
   return -1;
 }
 
-function startGitHttpBackend(projectRoot: string): ServerHandle {
+function startGitHttpBackend(projectRoot: string): Promise<ServerHandle> {
   const controller = new AbortController();
-  const port = allocatePort();
-  const url = `http://localhost:${port}`;
-
+  const { promise: portReady, resolve: resolvePort } = Promise.withResolvers<number>();
   Deno.serve(
-    { port, signal: controller.signal },
+    { port: 0, signal: controller.signal, onListen: (addr) => resolvePort((addr as Deno.NetAddr).port) },
     async (req: Request): Promise<Response> => {
       const u = new URL(req.url);
 
@@ -213,7 +203,7 @@ function startGitHttpBackend(projectRoot: string): ServerHandle {
     },
   );
 
-  return { url, controller };
+  return portReady.then((port) => ({ url: `http://localhost:${port}`, controller }));
 }
 
 // -- tests --
@@ -231,7 +221,7 @@ Deno.test("integration: local-fs store -> deno resolves and runs package", async
   }
 
   const store = createLocalFsStore({ baseDir: tmp });
-  const registry = startRegistry(store);
+  const registry = await startRegistry(store);
 
   const projectDir = Deno.makeTempDirSync({ prefix: "int-project-" });
   writeDenoJsonWithImport(projectDir, "@test/hello", registry.url, "1.0.0");
@@ -273,7 +263,7 @@ Deno.test("integration: git store file:// -> deno resolves and runs package", as
     await addPackageToGit(repo, "@test/gitpkg", "2.0.0", pkg);
 
     const store = createRemoteGitStore({ url: `file://${repo.bareDir}` });
-    const registry = startRegistry(store);
+    const registry = await startRegistry(store);
 
     // Verify registry discovers the package
     const packages = await store.list();
@@ -328,7 +318,7 @@ Deno.test("integration: git http-backend clone -> git store -> deno resolves pac
     const bareDest = join(gitRoot, "repo.git");
     await Deno.rename(repo.bareDir, bareDest);
 
-    const gitServer = startGitHttpBackend(gitRoot);
+    const gitServer = await startGitHttpBackend(gitRoot);
     const gitUrl = `${gitServer.url}/repo.git`;
 
     // Verify git clone over HTTP works
@@ -354,7 +344,7 @@ Deno.test("integration: git http-backend clone -> git store -> deno resolves pac
 
     // Now use our git store against the HTTP URL
     const store = createRemoteGitStore({ url: gitUrl });
-    const registry = startRegistry(store);
+    const registry = await startRegistry(store);
 
     const packages = await store.list();
     console.log("Registry packages:", JSON.stringify(packages));
@@ -431,7 +421,7 @@ Deno.test("integration: self-host -- this repo via git store -> deno uses ABC pa
   await runGit(["tag", "v0.0.0"]);
 
   const store = createRemoteGitStore({ url: `file://${bareDir}` });
-  const registry = startRegistry(store);
+  const registry = await startRegistry(store);
 
   const packages = await store.list();
   console.log("Discovered:", packages.map((p) => `${p.name} [${p.versions.join(", ")}]`).join(" | "));
@@ -491,7 +481,7 @@ Deno.test("integration: full pipeline -- git http-backend -> registry -> deno re
     const bareDest = join(gitRoot, "repo.git");
     await Deno.rename(repo.bareDir, bareDest);
 
-    const gitServer = startGitHttpBackend(gitRoot);
+    const gitServer = await startGitHttpBackend(gitRoot);
     const gitUrl = `${gitServer.url}/repo.git`;
 
     // Verify git clone works
@@ -510,7 +500,7 @@ Deno.test("integration: full pipeline -- git http-backend -> registry -> deno re
 
     // Registry reads from HTTP git
     const store = createRemoteGitStore({ url: gitUrl });
-    const registry = startRegistry(store);
+    const registry = await startRegistry(store);
 
     const packages = await store.list();
     console.log("Registry packages:", JSON.stringify(packages));
