@@ -104,6 +104,11 @@ if (import.meta.main) {
 
   const serve = await runPackageRegistry(options as PackageRegistryCliOptions);
 
+  console.log(JSON.stringify({
+    event: "registry_ready",
+    port: serve.tcpPort,
+  }));
+
   function shutdown() {
     serve.shutdown();
     Deno.exit();
