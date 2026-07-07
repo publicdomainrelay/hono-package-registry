@@ -168,10 +168,7 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
 
           if (pkgs.has(name)) continue;
 
-          const ver = typeof parsed.version === "string" && VALID_SEMVER.test(parsed.version)
-            ? parsed.version
-            : fallbackVersion;
-          pkgs.set(name, [ver]);
+          pkgs.set(name, [fallbackVersion]);
         }
       }
     }
@@ -251,7 +248,7 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
           const v = e.meta.version;
           best = {
             name,
-            version: typeof v === "string" && VALID_SEMVER.test(v) ? v : fallbackVersion,
+            version: fallbackVersion,
           };
         }
       }
@@ -293,7 +290,7 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
       arr.push({
         dir: e.dir,
         name,
-        version: typeof v === "string" && VALID_SEMVER.test(v) ? v : fallbackVersion,
+        version: fallbackVersion,
       });
     }
     arr.sort((a, b) => b.dir.length - a.dir.length);
@@ -361,9 +358,7 @@ export function createLocalFsStore(opts: LocalFsStoreOptions): PackageStore {
       const index = await getDenoJsonIndex();
       const entry = index.get(name);
       if (entry) {
-        const realVersion = typeof entry.meta.version === "string" && VALID_SEMVER.test(entry.meta.version)
-          ? entry.meta.version
-          : fallbackVersion;
+        const realVersion = fallbackVersion;
         if (version === realVersion || version === fallbackVersion) {
           const files = await rewriteFiles(await walkDir(entry.dir), entry.dir);
           const exports = entry.meta.exports;
