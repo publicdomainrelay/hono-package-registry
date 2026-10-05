@@ -73,7 +73,7 @@ async function createGitRepo(): Promise<GitRepo> {
   await git(["init"], workDir);
   await git(["config", "user.email", "test@test.com"], workDir);
   await git(["config", "user.name", "Integration Test"], workDir);
-  await git(["clone", "--bare", workDir, bareDir]);
+  await git(["clone", "--bare", workDir, bareDir], tmp);
   return { tmp, workDir, bareDir };
 }
 
