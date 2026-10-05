@@ -30,6 +30,9 @@ export interface PackageRegistryCliOptions {
   passthrough?: boolean;
   fallbackVersion?: string;
   logLevel?: LogLevel;
+  tlsCertFile?: string;
+  tlsKeyFile?: string;
+  portFile?: string;
 }
 
 function buildStore(config: StoreConfig, fallbackVersion: string): PackageStore {
@@ -83,7 +86,15 @@ export async function runPackageRegistry(
     fallbackVersion,
   });
 
-  const serve = createServe({ logger, tcp: { port } });
+  const serve = createServe({
+    logger,
+    tcp: {
+      port,
+      certFile: options.tlsCertFile as string | undefined,
+      keyFile: options.tlsKeyFile as string | undefined,
+    },
+    portFile: options.portFile as string | undefined,
+  });
   serve.app.route("/", app as never);
   await serve.beginServe();
   return serve;
